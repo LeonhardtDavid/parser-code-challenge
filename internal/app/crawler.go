@@ -9,7 +9,12 @@ import (
 	"io"
 	"net/http"
 	netUrl "net/url"
+	"slices"
 	"strings"
+)
+
+var (
+	avoidSchemes = []string{"javascript"}
 )
 
 type Crawler struct {
@@ -94,9 +99,10 @@ func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 
 	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
 		if ref, exists := selection.Attr("href"); exists {
+			// TODO avoid listing duplicated links
 			// avoids invalid links
 			trimmedRef := strings.TrimSpace(ref)
-			if _, err := netUrl.ParseRequestURI(trimmedRef); err == nil {
+			if parsedRef, err := netUrl.ParseRequestURI(trimmedRef); err == nil && !slices.Contains(avoidSchemes, parsedRef.Scheme) {
 				var link string
 
 				if strings.HasPrefix(trimmedRef, "//") {
