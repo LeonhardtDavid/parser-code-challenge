@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	Url string
+	Url netUrl.URL
 }
 
 func LoadConfig() (*Config, error) {
@@ -20,13 +20,10 @@ func LoadConfig() (*Config, error) {
 	if url == "" {
 		return nil, errors.New("url flag is required")
 	}
-	if uri, err := netUrl.ParseRequestURI(url); err != nil {
+	uri, err := netUrl.ParseRequestURI(url)
+	if err != nil {
 		return nil, fmt.Errorf("the provided url is invalid: %w", err)
-	} else if uri.Path != "" && uri.Path != "/" {
-		return nil, errors.New("the url should not contain a path")
-	} else if uri.RawQuery != "" {
-		return nil, errors.New("the url should not contain any query parameter")
 	}
 
-	return &Config{Url: url}, nil
+	return &Config{Url: *uri}, nil
 }

@@ -13,12 +13,14 @@ import (
 )
 
 type Crawler struct {
-	url     string
+	url     netUrl.URL
+	rawUrl  string
+	baseUrl string
 	storage storage.Storage
 }
 
 func (c *Crawler) Scan(_ context.Context) ([]model.VisitedPage, error) {
-	res, err := http.Get(c.url) // TODO use context
+	res, err := http.Get(c.rawUrl) // TODO use context
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
@@ -52,18 +54,18 @@ func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 	}
 
 	visitedPage := model.VisitedPage{
-		Url: c.url,
+		Url: c.rawUrl,
 	}
 
 	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
 		if ref, exists := selection.Attr("href"); exists {
 			// avoids invalid links
 			trimmedRef := strings.TrimSpace(ref)
-			if _, err := netUrl.ParseRequestURI(trimmedRef); err == nil {
+			if _, err := netUrl.Parse(trimmedRef); err == nil {
 				var link string
 
 				if strings.HasPrefix(trimmedRef, "/") {
-					link = c.url + trimmedRef
+					link = c.baseUrl + trimmedRef
 				} else {
 					link = trimmedRef
 				}
@@ -76,9 +78,11 @@ func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 	return &visitedPage, nil
 }
 
-func NewCrawler(url string, storage storage.Storage) Crawler {
+func NewCrawler(url netUrl.URL, storage storage.Storage) Crawler {
 	return Crawler{
 		url:     url,
+		rawUrl:  url.String(),
+		baseUrl: fmt.Sprintf("%s://%s", url.Scheme, url.Host),
 		storage: storage,
 	}
 }
