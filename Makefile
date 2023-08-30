@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	go build -o bin/parser cmd/parser-challenge/main.go cmd/parser-challenge/config.go
+	go build -o bin/crawler cmd/crawler/main.go cmd/crawler/config.go
 
 test-coverage:
 	@mkdir -p coverage

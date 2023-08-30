@@ -21,9 +21,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	crawler := app.NewCrawler(config.Url, scanner.New(), storage.NewStdoutStorage())
+	crawler := app.NewCrawler(
+		scanner.New(),
+		storage.NewStdoutStorage(),
+		app.WithMaxParallelism(config.Parallelism),
+	)
 
-	if err := crawler.RecursiveScanAndSave(ctx); err != nil {
+	if err := crawler.RecursiveScanAndSave(ctx, config.Url); err != nil {
 		log.Fatalf("Error crawling %q with error %v", config.Url, err)
 	}
 }

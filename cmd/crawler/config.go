@@ -9,12 +9,16 @@ import (
 )
 
 type Config struct {
-	Url *netUrl.URL
+	Url         *netUrl.URL
+	Parallelism uint
 }
 
 func LoadConfig() (*Config, error) {
 	var url string
 	flag.StringVar(&url, "url", "", "url on which the crawler will run")
+
+	var parallelism uint
+	flag.UintVar(&parallelism, "parallelism", 5, "max number of workers")
 
 	flag.Parse()
 
@@ -29,5 +33,8 @@ func LoadConfig() (*Config, error) {
 		return nil, errors.New("url must start with http or https")
 	}
 
-	return &Config{Url: uri}, nil
+	return &Config{
+		Url:         uri,
+		Parallelism: parallelism,
+	}, nil
 }

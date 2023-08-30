@@ -75,13 +75,15 @@ func (s *Scanner) getLinks(url *netUrl.URL, reader io.Reader) (*model.VisitedPag
 	return &visitedPage, nil
 }
 
-func WithClient(client *http.Client) func(*Scanner) {
+type Options = func(scanner *Scanner)
+
+func WithClient(client *http.Client) Options {
 	return func(s *Scanner) {
 		s.httpClient = client
 	}
 }
 
-func New(options ...func(scanner *Scanner)) *Scanner {
+func New(options ...Options) *Scanner {
 	s := &Scanner{
 		httpClient: http.DefaultClient,
 	}
