@@ -4,6 +4,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"net/http"
+	netUrl "net/url"
+	"strings"
 )
 
 type Crawler struct {
@@ -15,6 +17,7 @@ func (c *Crawler) Crawl() ([]string, error) {
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
+	defer res.Body.Close()
 
 	result, err := getLinks(res.Body)
 	if err != nil {
@@ -33,7 +36,11 @@ func getLinks(reader io.Reader) ([]string, error) {
 	var links []string
 	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
 		if ref, exists := selection.Attr("href"); exists {
-			links = append(links, ref)
+			// avoids invalid links
+			trimmedRef := strings.TrimSpace(ref)
+			if _, err := netUrl.ParseRequestURI(trimmedRef); err == nil {
+				links = append(links, trimmedRef)
+			}
 		}
 	})
 
