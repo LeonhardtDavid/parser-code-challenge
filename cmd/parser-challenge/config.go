@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	netUrl "net/url"
+	"strings"
 )
 
 type Config struct {
@@ -23,6 +24,9 @@ func LoadConfig() (*Config, error) {
 	uri, err := netUrl.ParseRequestURI(url)
 	if err != nil {
 		return nil, fmt.Errorf("the provided url is invalid: %w", err)
+	}
+	if !strings.HasPrefix(uri.Scheme, "http") {
+		return nil, errors.New("url must start with http or https")
 	}
 
 	return &Config{Url: uri}, nil
