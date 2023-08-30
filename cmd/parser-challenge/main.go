@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"github.com/LeonhardtDavid/parser-code-challenge/internal/app"
+	"github.com/LeonhardtDavid/parser-code-challenge/internal/storage"
 	"log"
 )
 
@@ -15,12 +17,12 @@ func main() {
 		log.Fatalf("Error on set up: %v", err)
 	}
 
-	crawler := app.NewCrawler(config.Url)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	result, err := crawler.Crawl()
-	if err != nil {
+	crawler := app.NewCrawler(config.Url, storage.NewStdoutStorage())
+
+	if err := crawler.ScanAndStore(ctx); err != nil {
 		log.Fatalf("Error crawling %q with error %v", config.Url, err)
 	}
-
-	log.Println(result)
 }

@@ -1,6 +1,10 @@
 package app
 
 import (
+	"context"
+	"fmt"
+	"github.com/LeonhardtDavid/parser-code-challenge/internal/model"
+	"github.com/LeonhardtDavid/parser-code-challenge/internal/storage"
 	"github.com/PuerkitoBio/goquery"
 	"io"
 	"net/http"
@@ -9,44 +13,72 @@ import (
 )
 
 type Crawler struct {
-	url string
+	url     string
+	storage storage.Storage
 }
 
-func (c *Crawler) Crawl() ([]string, error) {
-	res, err := http.Get(c.url)
+func (c *Crawler) Scan(_ context.Context) ([]model.VisitedPage, error) {
+	res, err := http.Get(c.url) // TODO use context
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
 	defer res.Body.Close()
 
-	result, err := getLinks(res.Body)
+	result, err := c.getLinks(res.Body)
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
 
-	return result, nil
+	return []model.VisitedPage{*result}, nil
 }
 
-func getLinks(reader io.Reader) ([]string, error) {
+func (c *Crawler) ScanAndStore(ctx context.Context) error {
+	visitedPages, err := c.Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := c.storage.SaveAll(ctx, visitedPages); err != nil {
+		return fmt.Errorf("error storing visited pages: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		return nil, err
 	}
 
-	var links []string
+	visitedPage := model.VisitedPage{
+		Url: c.url,
+	}
+
 	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
 		if ref, exists := selection.Attr("href"); exists {
 			// avoids invalid links
 			trimmedRef := strings.TrimSpace(ref)
 			if _, err := netUrl.ParseRequestURI(trimmedRef); err == nil {
-				links = append(links, trimmedRef)
+				var link string
+
+				if strings.HasPrefix(trimmedRef, "/") {
+					link = c.url + trimmedRef
+				} else {
+					link = trimmedRef
+				}
+
+				visitedPage.Links = append(visitedPage.Links, link)
 			}
 		}
 	})
 
-	return links, nil
+	return &visitedPage, nil
 }
 
-func NewCrawler(url string) Crawler {
-	return Crawler{url: url}
+func NewCrawler(url string, storage storage.Storage) Crawler {
+	return Crawler{
+		url:     url,
+		storage: storage,
+	}
 }
