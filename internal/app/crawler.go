@@ -7,6 +7,7 @@ import (
 	"github.com/LeonhardtDavid/parser-code-challenge/internal/scanner"
 	"github.com/LeonhardtDavid/parser-code-challenge/internal/storage"
 	netUrl "net/url"
+	"strings"
 	"sync"
 )
 
@@ -22,13 +23,16 @@ type Crawler struct {
 func (c *Crawler) markAsVisited(url string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.visited[url] = true
+	c.visited[removeTrailingSlash(url)] = true
 }
 
 func (c *Crawler) wasVisited(url string) bool {
-	// TODO trailing slashes could make a same page get visited twice
-	_, exists := c.visited[url]
+	_, exists := c.visited[removeTrailingSlash(url)]
 	return exists
+}
+
+func removeTrailingSlash(url string) string {
+	return strings.TrimSuffix(url, "/")
 }
 
 func (c *Crawler) ScanAndStore(ctx context.Context, url *netUrl.URL) (*model.VisitedPage, error) {
