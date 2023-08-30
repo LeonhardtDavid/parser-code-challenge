@@ -13,14 +13,18 @@ import (
 )
 
 type Crawler struct {
-	url     netUrl.URL
+	url     *netUrl.URL
 	rawUrl  string
 	baseUrl string
 	storage storage.Storage
 }
 
-func (c *Crawler) Scan(_ context.Context) ([]model.VisitedPage, error) {
-	res, err := http.Get(c.rawUrl) // TODO use context
+func (c *Crawler) Scan(ctx context.Context) (*model.VisitedPage, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.rawUrl, nil)
+	if err != nil {
+		return nil, err // TODO better errors?
+	}
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
@@ -31,17 +35,48 @@ func (c *Crawler) Scan(_ context.Context) ([]model.VisitedPage, error) {
 		return nil, err // TODO better errors?
 	}
 
-	return []model.VisitedPage{*result}, nil
+	return result, nil
 }
 
 func (c *Crawler) ScanAndStore(ctx context.Context) error {
-	visitedPages, err := c.Scan(ctx)
+	visitedPage, err := c.Scan(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := c.storage.SaveAll(ctx, visitedPages); err != nil {
+	if err := c.storage.Save(ctx, visitedPage); err != nil {
 		return fmt.Errorf("error storing visited pages: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Crawler) RecursiveScanAndSave(ctx context.Context) error {
+	visited := make(map[string]bool)
+	return c.recursiveScanAndSaveWithVisitedCheck(ctx, visited)
+}
+
+func (c *Crawler) recursiveScanAndSaveWithVisitedCheck(ctx context.Context, visited map[string]bool) error {
+	visited[c.rawUrl] = true
+	result, err := c.Scan(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := c.storage.Save(ctx, result); err != nil {
+		return fmt.Errorf("error storing visited pages: %w", err)
+	}
+
+	for _, link := range result.Links {
+		_, exists := visited[link]
+		if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && !exists && parsedLink.Host == c.url.Host {
+			visited[link] = true
+			crawler := NewCrawler(parsedLink, c.storage)
+			err := crawler.recursiveScanAndSaveWithVisitedCheck(ctx, visited)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -61,10 +96,12 @@ func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 		if ref, exists := selection.Attr("href"); exists {
 			// avoids invalid links
 			trimmedRef := strings.TrimSpace(ref)
-			if _, err := netUrl.Parse(trimmedRef); err == nil {
+			if _, err := netUrl.ParseRequestURI(trimmedRef); err == nil {
 				var link string
 
-				if strings.HasPrefix(trimmedRef, "/") {
+				if strings.HasPrefix(trimmedRef, "//") {
+					link = fmt.Sprintf("%s:%s", c.url.Scheme, trimmedRef)
+				} else if strings.HasPrefix(trimmedRef, "/") {
 					link = c.baseUrl + trimmedRef
 				} else {
 					link = trimmedRef
@@ -78,7 +115,7 @@ func (c *Crawler) getLinks(reader io.Reader) (*model.VisitedPage, error) {
 	return &visitedPage, nil
 }
 
-func NewCrawler(url netUrl.URL, storage storage.Storage) Crawler {
+func NewCrawler(url *netUrl.URL, storage storage.Storage) Crawler {
 	return Crawler{
 		url:     url,
 		rawUrl:  url.String(),

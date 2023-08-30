@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	Url netUrl.URL
+	Url *netUrl.URL
 }
 
 func LoadConfig() (*Config, error) {
@@ -25,5 +25,5 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("the provided url is invalid: %w", err)
 	}
 
-	return &Config{Url: *uri}, nil
+	return &Config{Url: uri}, nil
 }

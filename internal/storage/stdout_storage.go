@@ -9,8 +9,8 @@ import (
 
 type stdoutStorage struct{}
 
-func (s *stdoutStorage) SaveAll(_ context.Context, visitedPages []model.VisitedPage) error {
-	js, err := json.MarshalIndent(visitedPages, "", "  ")
+func (s *stdoutStorage) Save(_ context.Context, visitedPage *model.VisitedPage) error {
+	js, err := json.MarshalIndent(visitedPage, "", "  ")
 	if err == nil {
 		log.Println(string(js))
 	}

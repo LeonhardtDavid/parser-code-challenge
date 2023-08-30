@@ -22,7 +22,7 @@ func main() {
 
 	crawler := app.NewCrawler(config.Url, storage.NewStdoutStorage())
 
-	if err := crawler.ScanAndStore(ctx); err != nil {
+	if err := crawler.RecursiveScanAndSave(ctx); err != nil {
 		log.Fatalf("Error crawling %q with error %v", config.Url, err)
 	}
 }

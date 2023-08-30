@@ -6,5 +6,5 @@ import (
 )
 
 type Storage interface {
-	SaveAll(ctx context.Context, visitedPages []model.VisitedPage) error
+	Save(ctx context.Context, visitedPage *model.VisitedPage) error
 }
