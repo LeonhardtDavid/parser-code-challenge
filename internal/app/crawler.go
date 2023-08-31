@@ -80,7 +80,7 @@ func (c *Crawler) worker(ctx context.Context, wg *sync.WaitGroup, urls chan *net
 			if result, err := c.ScanAndStore(ctx, url); err == nil {
 				for _, link := range result.Links {
 					if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
-						go func() { // Running in a goroutine to avoid blocks
+						go func() { // Running in a goroutine to avoid blocks in case we max out the capacity of the channel (links get queued faster that processed)
 							urls <- parsedLink
 						}()
 					}
