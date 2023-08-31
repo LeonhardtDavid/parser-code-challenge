@@ -25,6 +25,7 @@ func main() {
 		scanner.New(),
 		storage.NewStdoutStorage(),
 		app.WithMaxParallelism(config.Parallelism),
+		app.WithTimeout(config.Timeout),
 	)
 
 	if err := crawler.RecursiveScanAndSave(ctx, config.Url); err != nil {

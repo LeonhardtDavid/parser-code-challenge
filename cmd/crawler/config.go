@@ -6,11 +6,13 @@ import (
 	"fmt"
 	netUrl "net/url"
 	"strings"
+	"time"
 )
 
 type Config struct {
 	Url         *netUrl.URL
 	Parallelism uint
+	Timeout     time.Duration
 }
 
 func LoadConfig() (*Config, error) {
@@ -19,6 +21,9 @@ func LoadConfig() (*Config, error) {
 
 	var parallelism uint
 	flag.UintVar(&parallelism, "parallelism", 5, "max number of workers")
+
+	var timeout time.Duration
+	flag.DurationVar(&timeout, "timeout", 5*time.Second, "duration to wait on inactivity - hacky solution...")
 
 	flag.Parse()
 
@@ -36,5 +41,6 @@ func LoadConfig() (*Config, error) {
 	return &Config{
 		Url:         uri,
 		Parallelism: parallelism,
+		Timeout:     timeout,
 	}, nil
 }

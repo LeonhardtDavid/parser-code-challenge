@@ -9,6 +9,7 @@ import (
 	netUrl "net/url"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Crawler struct {
@@ -16,6 +17,7 @@ type Crawler struct {
 	scanner        *scanner.Scanner
 	storage        storage.Storage
 
+	timeout time.Duration
 	visited map[string]bool
 	mu      sync.Mutex
 }
@@ -27,6 +29,8 @@ func (c *Crawler) markAsVisited(url string) {
 }
 
 func (c *Crawler) wasVisited(url string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	_, exists := c.visited[removeTrailingSlash(url)]
 	return exists
 }
@@ -53,7 +57,7 @@ func (c *Crawler) RecursiveScanAndSave(ctx context.Context, url *netUrl.URL) err
 	var wg sync.WaitGroup
 	urls := make(chan *netUrl.URL, maxWorkers*2)
 
-	for i := 0; i < int(maxWorkers); i++ {
+	for i := uint(0); i < maxWorkers; i++ {
 		wg.Add(1)
 		go c.worker(ctx, &wg, urls, url.Host)
 	}
@@ -67,15 +71,31 @@ func (c *Crawler) RecursiveScanAndSave(ctx context.Context, url *netUrl.URL) err
 }
 
 func (c *Crawler) worker(ctx context.Context, wg *sync.WaitGroup, urls chan *netUrl.URL, host string) {
-	defer wg.Done()
+	//defer wg.Done()
+	go c.checkDone(wg, urls) // TODO is there a better way to check if there is no more links? this is a clumsy solution
 	for url := range urls {
-		c.markAsVisited(url.String())
-		if result, err := c.ScanAndStore(ctx, url); err == nil {
-			for _, link := range result.Links {
-				if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host && !c.wasVisited(link) {
-					urls <- parsedLink
+		urlString := url.String()
+		if !c.wasVisited(urlString) {
+			c.markAsVisited(urlString)
+			if result, err := c.ScanAndStore(ctx, url); err == nil {
+				for _, link := range result.Links {
+					if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
+						go func() { // Running in a goroutine to avoid blocks
+							urls <- parsedLink
+						}()
+					}
 				}
 			}
+		}
+	}
+}
+
+func (c *Crawler) checkDone(wg *sync.WaitGroup, urls chan *netUrl.URL) {
+	for {
+		time.Sleep(c.timeout)
+		if len(urls) == 0 {
+			wg.Done()
+			return
 		}
 	}
 }
@@ -88,11 +108,18 @@ func WithMaxParallelism(parallelism uint) Options {
 	}
 }
 
+func WithTimeout(timeout time.Duration) Options {
+	return func(s *Crawler) {
+		s.timeout = timeout
+	}
+}
+
 func NewCrawler(scanner *scanner.Scanner, storage storage.Storage, options ...Options) *Crawler {
 	c := &Crawler{
 		maxParallelism: 1,
 		scanner:        scanner,
 		storage:        storage,
+		timeout:        5 * time.Second,
 		visited:        make(map[string]bool),
 	}
 

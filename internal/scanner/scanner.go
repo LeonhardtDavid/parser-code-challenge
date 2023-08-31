@@ -53,7 +53,7 @@ func (s *Scanner) getLinks(url *netUrl.URL, reader io.Reader) (*model.VisitedPag
 
 	doc.Find("a").Each(func(_ int, selection *goquery.Selection) {
 		if ref, exists := selection.Attr("href"); exists {
-			// TODO avoid listing duplicated links
+			// TODO avoid listing duplicated links?
 			// avoids invalid links
 			trimmedRef := strings.TrimSpace(ref)
 			if parsedRef, err := netUrl.ParseRequestURI(trimmedRef); err == nil && !slices.Contains(avoidSchemes, parsedRef.Scheme) {
