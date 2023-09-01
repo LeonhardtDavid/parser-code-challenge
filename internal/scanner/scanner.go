@@ -27,17 +27,17 @@ type scannerImpl struct {
 func (s scannerImpl) LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.VisitedPage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
-		return nil, err // TODO better errors?
+		return nil, err
 	}
 	res, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, err // TODO better errors?
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	result, err := getLinks(url, res.Body)
 	if err != nil {
-		return nil, err // TODO better errors?
+		return nil, err
 	}
 
 	return result, nil
