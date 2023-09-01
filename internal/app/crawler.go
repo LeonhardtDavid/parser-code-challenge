@@ -9,6 +9,7 @@ import (
 	netUrl "net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,9 +18,9 @@ type Crawler struct {
 	scanner        *scanner.Scanner
 	storage        storage.Storage
 
-	timeout time.Duration
-	visited map[string]bool
-	mu      sync.Mutex
+	visited      map[string]bool
+	visitCounter atomic.Int64
+	mu           sync.Mutex
 }
 
 func (c *Crawler) markAsVisited(url string) {
@@ -54,47 +55,50 @@ func (c *Crawler) ScanAndStore(ctx context.Context, url *netUrl.URL) (*model.Vis
 
 func (c *Crawler) RecursiveScanAndSave(ctx context.Context, url *netUrl.URL) error {
 	maxWorkers := c.maxParallelism
-	var wg sync.WaitGroup
 	urls := make(chan *netUrl.URL, maxWorkers*2)
+	done := make(chan bool)
 
 	for i := uint(0); i < maxWorkers; i++ {
-		wg.Add(1)
-		go c.worker(ctx, &wg, urls, url.Host)
+		go c.worker(ctx, url.Host, urls, done)
 	}
 
+	c.visitCounter.Add(1)
 	urls <- url
 
-	wg.Wait()
+	wait := true
+	for wait { // TODO is there a better way to check if there is no more links? this seems a clumsy solution
+		time.Sleep(500 * time.Millisecond)
+		if c.visitCounter.Load() == 0 {
+			wait = false
+			close(done)
+		}
+	}
+
 	close(urls)
 
 	return nil
 }
 
-func (c *Crawler) worker(ctx context.Context, wg *sync.WaitGroup, urls chan *netUrl.URL, host string) {
-	//defer wg.Done()
-	go c.checkDone(wg, urls) // TODO is there a better way to check if there is no more links? this is a clumsy solution
-	for url := range urls {
-		urlString := url.String()
-		if !c.wasVisited(urlString) {
-			c.markAsVisited(urlString)
-			if result, err := c.ScanAndStore(ctx, url); err == nil {
-				for _, link := range result.Links {
-					if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
-						go func() { // Running in a goroutine to avoid blocks in case we max out the capacity of the channel (links get queued faster that processed)
-							urls <- parsedLink
-						}()
+func (c *Crawler) worker(ctx context.Context, host string, urls chan *netUrl.URL, done <-chan bool) {
+	for {
+		select {
+		case url := <-urls:
+			urlString := url.String()
+			if !c.wasVisited(urlString) {
+				c.markAsVisited(urlString)
+				if result, err := c.ScanAndStore(ctx, url); err == nil {
+					for _, link := range result.Links {
+						if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
+							go func() { // Running in a goroutine to avoid blocks in case we max out the capacity of the channel (links get queued faster that processed)
+								c.visitCounter.Add(1)
+								urls <- parsedLink
+							}()
+						}
 					}
 				}
 			}
-		}
-	}
-}
-
-func (c *Crawler) checkDone(wg *sync.WaitGroup, urls chan *netUrl.URL) {
-	for {
-		time.Sleep(c.timeout)
-		if len(urls) == 0 {
-			wg.Done()
+			c.visitCounter.Add(-1)
+		case <-done:
 			return
 		}
 	}
@@ -108,18 +112,11 @@ func WithMaxParallelism(parallelism uint) Options {
 	}
 }
 
-func WithTimeout(timeout time.Duration) Options {
-	return func(s *Crawler) {
-		s.timeout = timeout
-	}
-}
-
 func NewCrawler(scanner *scanner.Scanner, storage storage.Storage, options ...Options) *Crawler {
 	c := &Crawler{
 		maxParallelism: 1,
 		scanner:        scanner,
 		storage:        storage,
-		timeout:        5 * time.Second,
 		visited:        make(map[string]bool),
 	}
 
