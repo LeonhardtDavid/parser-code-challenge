@@ -27,7 +27,7 @@ func main() {
 		app.WithMaxParallelism(config.Parallelism),
 	)
 
-	if err := crawler.RecursiveScanAndSave(ctx, config.Url); err != nil {
+	if err := crawler.RecursiveScanAndStore(ctx, config.Url); err != nil {
 		log.Fatalf("Error crawling %q with error %v", config.Url, err)
 	}
 }

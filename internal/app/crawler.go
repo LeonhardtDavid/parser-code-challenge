@@ -15,7 +15,7 @@ import (
 
 type Crawler struct {
 	maxParallelism uint
-	scanner        *scanner.Scanner
+	scanner        scanner.Scanner
 	storage        storage.Storage
 
 	visited      map[string]bool
@@ -53,7 +53,7 @@ func (c *Crawler) ScanAndStore(ctx context.Context, url *netUrl.URL) (*model.Vis
 	return visitedPage, nil
 }
 
-func (c *Crawler) RecursiveScanAndSave(ctx context.Context, url *netUrl.URL) error {
+func (c *Crawler) RecursiveScanAndStore(ctx context.Context, url *netUrl.URL) error {
 	maxWorkers := c.maxParallelism
 	urls := make(chan *netUrl.URL, maxWorkers*2)
 	done := make(chan bool)
@@ -112,7 +112,7 @@ func WithMaxParallelism(parallelism uint) Options {
 	}
 }
 
-func NewCrawler(scanner *scanner.Scanner, storage storage.Storage, options ...Options) *Crawler {
+func NewCrawler(scanner scanner.Scanner, storage storage.Storage, options ...Options) *Crawler {
 	c := &Crawler{
 		maxParallelism: 1,
 		scanner:        scanner,

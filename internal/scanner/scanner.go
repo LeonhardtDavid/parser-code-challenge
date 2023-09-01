@@ -16,11 +16,15 @@ var (
 	avoidSchemes = []string{"javascript"}
 )
 
-type Scanner struct {
+type Scanner interface {
+	LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.VisitedPage, error)
+}
+
+type scannerImpl struct {
 	httpClient *http.Client
 }
 
-func (s *Scanner) LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.VisitedPage, error) {
+func (s scannerImpl) LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.VisitedPage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err // TODO better errors?
@@ -31,7 +35,7 @@ func (s *Scanner) LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.V
 	}
 	defer res.Body.Close()
 
-	result, err := s.getLinks(url, res.Body)
+	result, err := getLinks(url, res.Body)
 	if err != nil {
 		return nil, err // TODO better errors?
 	}
@@ -39,7 +43,7 @@ func (s *Scanner) LookupForLinks(ctx context.Context, url *netUrl.URL) (*model.V
 	return result, nil
 }
 
-func (s *Scanner) getLinks(url *netUrl.URL, reader io.Reader) (*model.VisitedPage, error) {
+func getLinks(url *netUrl.URL, reader io.Reader) (*model.VisitedPage, error) {
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		return nil, err
@@ -75,16 +79,19 @@ func (s *Scanner) getLinks(url *netUrl.URL, reader io.Reader) (*model.VisitedPag
 	return &visitedPage, nil
 }
 
-type Options = func(scanner *Scanner)
+type Options func(scanner Scanner)
 
 func WithClient(client *http.Client) Options {
-	return func(s *Scanner) {
-		s.httpClient = client
+	return func(s Scanner) {
+		switch impl := s.(type) {
+		case *scannerImpl:
+			impl.httpClient = client
+		}
 	}
 }
 
-func New(options ...Options) *Scanner {
-	s := &Scanner{
+func New(options ...Options) Scanner {
+	s := &scannerImpl{
 		httpClient: http.DefaultClient,
 	}
 
