@@ -56,51 +56,42 @@ func (c *Crawler) ScanAndStore(ctx context.Context, url *netUrl.URL) (*model.Vis
 func (c *Crawler) RecursiveScanAndStore(ctx context.Context, url *netUrl.URL) error {
 	maxWorkers := c.maxParallelism
 	urls := make(chan *netUrl.URL, maxWorkers*2)
-	done := make(chan bool)
 
 	for i := uint(0); i < maxWorkers; i++ {
-		go c.worker(ctx, url.Host, urls, done)
+		go c.worker(ctx, url.Host, urls)
 	}
 
 	c.visitCounter.Add(1)
 	urls <- url
 
-	wait := true
-	for wait { // TODO is there a better way to check if there is no more links? this seems a clumsy solution
+	for { // TODO is there a better way to check if there is no more links? this seems a clumsy solution
 		time.Sleep(500 * time.Millisecond)
-		if c.visitCounter.Load() == 0 {
-			wait = false
-			close(done)
+		if c.visitCounter.Load() == 0 && len(urls) == 0 {
+			close(urls)
+			break
 		}
 	}
-
-	close(urls)
 
 	return nil
 }
 
-func (c *Crawler) worker(ctx context.Context, host string, urls chan *netUrl.URL, done <-chan bool) {
-	for {
-		select {
-		case url := <-urls:
-			urlString := url.String()
-			if !c.wasVisited(urlString) {
-				c.markAsVisited(urlString)
-				if result, err := c.ScanAndStore(ctx, url); err == nil {
-					for _, link := range result.Links {
-						if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
-							go func() { // Running in a goroutine to avoid blocks in case we max out the capacity of the channel (links get queued faster that processed)
-								c.visitCounter.Add(1)
-								urls <- parsedLink
-							}()
-						}
+func (c *Crawler) worker(ctx context.Context, host string, urls chan *netUrl.URL) {
+	for url := range urls {
+		urlString := url.String()
+		if !c.wasVisited(urlString) {
+			c.markAsVisited(urlString)
+			if result, err := c.ScanAndStore(ctx, url); err == nil {
+				for _, link := range result.Links {
+					if parsedLink, err := netUrl.ParseRequestURI(link); err == nil && parsedLink.Host == host {
+						go func() { // Running in a goroutine to avoid blocks in case we max out the capacity of the channel (links get queued faster that processed)
+							c.visitCounter.Add(1)
+							urls <- parsedLink
+						}()
 					}
 				}
 			}
-			c.visitCounter.Add(-1)
-		case <-done:
-			return
 		}
+		c.visitCounter.Add(-1)
 	}
 }
 
