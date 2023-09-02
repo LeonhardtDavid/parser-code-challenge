@@ -23,7 +23,9 @@ When you’re ready, please submit your solution as a ZIP file.
 
 ### Running the crawler
 
-_[Go](https://go.dev/) and [make](https://man7.org/linux/man-pages/man1/make.1.html) are required to run the application._
+_[Go](https://go.dev/) is required to run the application.
+[make](https://man7.org/linux/man-pages/man1/make.1.html) is useful, but not required, you can run the commands that are in the Makefile.
+Vendor directory was added to void download the dependencies before running the tests or build._
 
 ```shell
 make build
