@@ -95,3 +95,7 @@ Last thing, I implemented a `Storage` interface to handle the storage of the res
 The only current implementation is not really a storage, because it prints out the results to the `stdout`. The idea here
 was to have an easy way to implement different alternatives to persist the result into a file or database, probably an
 overkill for this challenge.
+
+**NOTE:** This implementation isn't perfect anyway, there are some edge cases where we can request the same page more
+than once. We use a Mutex to read and write concurrently the set of visited pages, but some race condition could occur
+making two (or more) goroutines reads that the page hasn't been visited and enqueue the url to be processed multiple times.
