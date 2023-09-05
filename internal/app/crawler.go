@@ -20,7 +20,7 @@ type Crawler struct {
 
 	visited      map[string]bool
 	visitCounter atomic.Int64
-	mu           sync.Mutex
+	mu           sync.RWMutex
 }
 
 func (c *Crawler) markAsVisited(url string) {
@@ -30,8 +30,8 @@ func (c *Crawler) markAsVisited(url string) {
 }
 
 func (c *Crawler) wasVisited(url string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	_, exists := c.visited[removeTrailingSlash(url)]
 	return exists
 }
